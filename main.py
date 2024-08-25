@@ -3,6 +3,8 @@ import random
 import time
 from pathlib import Path
 
+import os
+
 from rich.progress import Progress
 
 from utils import Crawler, log
@@ -41,11 +43,13 @@ def main() -> None:
     else:
         if args.upper_bound is None or args.lower_bound is None:
             parser.error("在范围模式下，必须同时提供 --upper-bound 和 --lower-bound")
-        range_donwload(args.url, args.lower_bound, args.upper_bound)
+        range_download(args.url, args.lower_bound, args.upper_bound)
 
 
 def save(name: str, content: str) -> None:
-    path = Path(f"{name}.txt")
+    if not os.path.exists("qd_novels"):
+        os.mkdir("qd_novels")
+    path = Path(f"qd_novels/{name}.txt")
     path.write_text(content, "utf-8")
 
 
@@ -73,7 +77,7 @@ def full_download(url: str) -> None:
             log.info("✨ 小说保存完毕")
 
 
-def range_donwload(url: str, lower_bound: int, upper_bound: int) -> None:
+def range_download(url: str, lower_bound: int, upper_bound: int) -> None:
     if lower_bound > upper_bound:
         lower_bound, upper_bound = upper_bound, lower_bound
     lower_bound -= 1  # 更加符合习惯用法
