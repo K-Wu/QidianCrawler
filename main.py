@@ -10,7 +10,8 @@ from rich.progress import Progress
 from utils import Crawler, log
 
 
-def main() -> None:
+def main() -> str | None:
+    # Returns the absolute path of the saved file
     parser = argparse.ArgumentParser(description="🕸️ 基于DrissionPage库的起点小说爬虫。")
     parser.add_argument(
         "-m",
@@ -39,21 +40,24 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.mode == "full":
-        full_download(args.url)
+        path = full_download(args.url)
     else:
         if args.upper_bound is None or args.lower_bound is None:
             parser.error("在范围模式下，必须同时提供 --upper-bound 和 --lower-bound")
-        range_download(args.url, args.lower_bound, args.upper_bound)
+        path = range_download(args.url, args.lower_bound, args.upper_bound)
+    return path
 
-
-def save(name: str, content: str) -> None:
+def save(name: str, content: str) -> str:
+    # Returns the absolute path of the saved file
     if not os.path.exists("qd_novels"):
         os.mkdir("qd_novels")
     path = Path(f"qd_novels/{name}.txt")
     path.write_text(content, "utf-8")
+    return path.resolve().as_posix()
 
 
-def full_download(url: str) -> None:
+def full_download(url: str) -> str | None:
+    # Returns the absolute path of the saved file
     crawler = Crawler()
     log.info("🎉 DrissionPage初始化完毕")
 
@@ -73,11 +77,12 @@ def full_download(url: str) -> None:
             log.error(e)
         finally:
             content = "\n".join(chpts)
-            save(index.name, content)
+            path = save(index.name, content)
             log.info("✨ 小说保存完毕")
+            return path
 
 
-def range_download(url: str, lower_bound: int, upper_bound: int) -> None:
+def range_download(url: str, lower_bound: int, upper_bound: int) -> str | None:
     if lower_bound > upper_bound:
         lower_bound, upper_bound = upper_bound, lower_bound
     lower_bound -= 1  # 更加符合习惯用法
@@ -103,8 +108,9 @@ def range_download(url: str, lower_bound: int, upper_bound: int) -> None:
             log.error(e)
         finally:
             content = "\n".join(chpts)
-            save(f"{index.name}-{lower_bound + 1}-{upper_bound}", content)
+            path = save(f"{index.name}-{lower_bound + 1}-{upper_bound}", content)
             log.info("✨ 小说保存完毕")
+            return path
 
 
 if __name__ == "__main__":
