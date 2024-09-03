@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 from typing import NamedTuple
 
-from DrissionPage import ChromiumPage
+from DrissionPage import ChromiumPage, ChromiumOptions
 from rich.logging import RichHandler
 
 logging.basicConfig(
@@ -25,8 +25,15 @@ class Index(NamedTuple):
 
 
 class Crawler:
-    def __init__(self) -> None:
-        self.page = ChromiumPage()
+    def __init__(self, headless_flag: bool = True) -> None:
+        if headless_flag:
+            co = ChromiumOptions().headless()
+            self.page = ChromiumPage(co)
+        else:
+            self.page = ChromiumPage()
+
+    def __del__(self) -> None:
+        self.page.quit()
 
     def get_index(self, url: str) -> Index:
         self.page.get(url)
