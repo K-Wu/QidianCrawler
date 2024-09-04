@@ -3,6 +3,7 @@ import argparse
 import random
 import time
 from pathlib import Path
+from typing import Optional
 
 import os
 
@@ -19,7 +20,7 @@ def main() -> str | None:
     parser.add_argument(
         "-m",
         "--mode",
-        choices=["full", "range"],
+        choices=["full", "range", "word_count"],
         required=True,
         help='下载模式：选择 "full" 为全文下载，选择 "range" 为范围下载',
     )
@@ -31,7 +32,7 @@ def main() -> str | None:
         "--upper-bound",
         type=int,
         default=None,
-        help='范围下载的上界（仅当选择 "range" 模式时有效）',
+        help='范围下载的上界（仅当选择 "range" 模式时有效）；或是字数下载的最大字数（"word_count"模式）',
     )
     parser.add_argument(
         "-l",
@@ -44,12 +45,16 @@ def main() -> str | None:
 
     if args.mode == "full":
         path = full_download(args.url)
-    else:
+    elif args.mode == "range":
         if args.upper_bound is None or args.lower_bound is None:
             parser.error(
                 "在范围模式下，必须同时提供 --upper-bound 和 --lower-bound"
             )
         path = range_download(args.url, args.lower_bound, args.upper_bound)
+    else:
+        if args.upper_bound is None:
+            parser.error("在字数模式下，必须提供 --upper-bound")
+        path = full_download(args.url, word_limit=args.upper_bound)
     return path
 
 
@@ -62,7 +67,7 @@ def save(name: str, content: str) -> str:
     return path.resolve().as_posix()
 
 
-def full_download(url: str) -> str | None:
+def full_download(url: str, word_limit: Optional[int] = None) -> str | None:
     # Returns the absolute path of the saved file
     crawler = Crawler()
     log.info("🎉 DrissionPage初始化完毕")
@@ -71,20 +76,33 @@ def full_download(url: str) -> str | None:
     log.info(f"🎈 正在下载《{index.name}》，具有{len(index.chpts)}章节的小说")
 
     chpts: list[str] = []
+    word_count: int = 0
     with Progress() as progress:
-        download = progress.add_task("🛻 下载中", total=len(index.chpts))
+        if word_limit is not None:
+            download = progress.add_task("🛻 下载中", total=word_limit)
+        else:
+            download = progress.add_task("🛻 下载中", total=len(index.chpts))
         try:
             for info in index.chpts:
                 chpt: str = crawler.get_chpt(info.url)
-                # TODO: count the number of words in the chapter
+                # Count the number of words in the chapter
+                if word_limit is not None:
+                    progress.advance(download, advance=min(len(chpt), word_limit - word_count))
+                    if word_count > word_limit:
+                        break
+                else:
+                    progress.advance(download)
+                word_count += len(chpt)
                 chpts.append(chpt)
-                progress.advance(download)
                 # time.sleep(random.uniform(2, 5))
         except Exception as e:
             log.error(e)
         finally:
             content = "\n".join(chpts)
-            path = save(index.name, content)
+            save_name = index.name
+            if word_limit is not None:
+                save_name += f"-wl{word_limit}"
+            path = save(save_name, content)
             log.info("✨ 小说保存完毕")
             return path
 
@@ -114,7 +132,7 @@ def range_download(url: str, lower_bound: int, upper_bound: int) -> str | None:
                 chpt = crawler.get_chpt(info.url)
                 chpts.append(chpt)
                 progress.advance(download)
-                time.sleep(random.uniform(5, 7))
+                # time.sleep(random.uniform(5, 7))
         except Exception as e:
             log.error(e)
         finally:
